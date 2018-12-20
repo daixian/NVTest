@@ -1,4 +1,4 @@
-
+﻿
 //#define D3D9
 //#define WINDOWED
 
@@ -28,15 +28,15 @@
 #pragma comment(lib, "d3dx10.lib")
 #endif
 
-typedef int D3D10_FEATURE_LEVEL1;
-typedef enum
-{
-    NVAPI_DEVICE_FEATURE_LEVEL_NULL       = -1,
-    NVAPI_DEVICE_FEATURE_LEVEL_10_0       = 0,
-    NVAPI_DEVICE_FEATURE_LEVEL_10_0_PLUS  = 1,
-    NVAPI_DEVICE_FEATURE_LEVEL_10_1       = 2,
-    NVAPI_DEVICE_FEATURE_LEVEL_11_0       = 3,
-} NVAPI_DEVICE_FEATURE_LEVEL;
+//typedef int D3D10_FEATURE_LEVEL1;
+//typedef enum
+//{
+//    NVAPI_DEVICE_FEATURE_LEVEL_NULL       = -1,
+//    NVAPI_DEVICE_FEATURE_LEVEL_10_0       = 0,
+//    NVAPI_DEVICE_FEATURE_LEVEL_10_0_PLUS  = 1,
+//    NVAPI_DEVICE_FEATURE_LEVEL_10_1       = 2,
+//    NVAPI_DEVICE_FEATURE_LEVEL_11_0       = 3,
+//} NVAPI_DEVICE_FEATURE_LEVEL;
 
 #include "nvapi.h"
 #pragma comment(lib, "nvapi.lib")
@@ -475,6 +475,13 @@ bool CreateWindowAndDevice()
     }
     else
     {
+        //赶紧设置为直连模式
+        status = NvAPI_Stereo_SetDriverMode(NV_STEREO_DRIVER_MODE::NVAPI_STEREO_DRIVER_MODE_DIRECT);
+        if (status != NVAPI_OK)
+        {
+            MessageBoxA(NULL, "没法设置成直连模式！", "NvAPI_Stereo_SetDriverMode failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
+        }
+
         // Check the Stereo availability
         NvU8 isStereoEnabled;
         status = NvAPI_Stereo_IsEnabled(&isStereoEnabled);
@@ -493,6 +500,7 @@ bool CreateWindowAndDevice()
             status = NvAPI_Stereo_Enable();
         }
 
+        //为当前应用程序创建新的配置注册表项。
         NvAPI_Stereo_CreateConfigurationProfileRegistryKey(NVAPI_STEREO_DEFAULT_REGISTRY_PROFILE);
     }
 
@@ -744,10 +752,11 @@ bool CreateWindowAndDevice()
         MessageBoxA(NULL, "Couldn't create the StereoHandle", "NvAPI_Stereo_CreateHandleFromIUnknown failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
     }
 
-    if (NVAPI_OK != NvAPI_Stereo_GetEyeSeparation(g_StereoHandle,&g_EyeSeparation ))
-    {
-        MessageBoxA(NULL, "Couldn't get the hardware eye separation", "NvAPI_Stereo_GetEyeSeparation failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-    }
+    //这里不用再搞这个什么眼睛分离信息
+    //if (NVAPI_OK != NvAPI_Stereo_GetEyeSeparation(g_StereoHandle,&g_EyeSeparation ))
+    //{
+    //    MessageBoxA(NULL, "Couldn't get the hardware eye separation", "NvAPI_Stereo_GetEyeSeparation failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
+    //}
 
     // Create the RenderTarget View
     ID3D10Texture2D* lBuffer;
@@ -1036,6 +1045,24 @@ void Render()
 {
     static unsigned int frameNb = 0;
 
+    if (frameNb % 2 == 0)
+    {
+        auto status = NvAPI_Stereo_SetActiveEye(g_StereoHandle, NV_STEREO_ACTIVE_EYE::NVAPI_STEREO_EYE_LEFT);
+        if (status != NVAPI_OK)
+        {
+            MessageBoxA(NULL, "没法设置成目标左眼！", "NvAPI_Stereo_SetActiveEye failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
+        }
+    }
+    else
+    {
+        auto status = NvAPI_Stereo_SetActiveEye(g_StereoHandle, NV_STEREO_ACTIVE_EYE::NVAPI_STEREO_EYE_RIGHT);
+        if (status != NVAPI_OK)
+        {
+            MessageBoxA(NULL, "没法设置成目标右眼！", "NvAPI_Stereo_SetActiveEye failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
+        }
+    }
+
+
 #ifdef D3D9
     HRESULT coop_lvl = g_D3D9Device->TestCooperativeLevel();
 
@@ -1226,15 +1253,17 @@ void Render()
 
     if (frameNb > 2)
     {
-        float sep, conv;
-        if (NVAPI_OK != NvAPI_Stereo_GetSeparation(g_StereoHandle,&sep ))
-        {
-         //   MessageBoxA(NULL, "Couldn't get the separation", "NvAPI_Stereo_GetSeparation failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-        }
-        if (NVAPI_OK != NvAPI_Stereo_GetConvergence(g_StereoHandle,&conv ))
-        {
-         //   MessageBoxA(NULL, "Couldn't get the convergence", "NvAPI_Stereo_GetConvergence failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-        }
+ 
+        float sep=0, conv=0;
+        //这里不去获取什么分离值
+        //if (NVAPI_OK != NvAPI_Stereo_GetSeparation(g_StereoHandle,&sep ))
+        //{
+        // //   MessageBoxA(NULL, "Couldn't get the separation", "NvAPI_Stereo_GetSeparation failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
+        //}
+        //if (NVAPI_OK != NvAPI_Stereo_GetConvergence(g_StereoHandle,&conv ))
+        //{
+        // //   MessageBoxA(NULL, "Couldn't get the convergence", "NvAPI_Stereo_GetConvergence failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
+        //}
         if (sep * 0.01 != g_Separation || conv != g_Convergence)
         {
             g_Separation = sep * 0.01;
@@ -1244,6 +1273,7 @@ void Render()
 
             g_StereoParamD3D10.updateStereoParamsMap( g_D3D10Device, g_EyeSeparation, g_Separation, g_Convergence );
         }
+
 
 
         // first draw the grid of boxes in color and depth buffer
