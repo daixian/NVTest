@@ -491,7 +491,6 @@ bool CreateWindowAndDevice()
         {
             // GeForce Stereoscopic 3D driver is not installed on the system
             MessageBoxA(NULL, "Stereo is not available\nMake sure the stereo driver is installed correctly", "Stereo not available", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-
         }
         // Stereo is available but not enabled, let's enable it
         else if(NVAPI_OK == status && !isStereoEnabled)
@@ -504,182 +503,6 @@ bool CreateWindowAndDevice()
         NvAPI_Stereo_CreateConfigurationProfileRegistryKey(NVAPI_STEREO_DEFAULT_REGISTRY_PROFILE);
     }
 
-#ifdef D3D9
-
-    g_D3D9 = Direct3DCreate9(D3D_SDK_VERSION);
-
-    g_D3D9PresentParams.BackBufferFormat = D3DFMT_A8R8G8B8;
-    g_D3D9PresentParams.BackBufferCount = 1;
-    g_D3D9PresentParams.MultiSampleType = D3DMULTISAMPLE_NONE;
-    g_D3D9PresentParams.MultiSampleQuality = 0;
-    g_D3D9PresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD;
-    g_D3D9PresentParams.hDeviceWindow = g_hWnd;
-    g_D3D9PresentParams.EnableAutoDepthStencil = FALSE;
-    g_D3D9PresentParams.AutoDepthStencilFormat = D3DFMT_UNKNOWN;
-    g_D3D9PresentParams.Flags = D3DPRESENTFLAG_LOCKABLE_BACKBUFFER;
-    g_D3D9PresentParams.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-
-#ifdef WINDOWED
-    RECT rect;
-    GetWindowRect( g_hWnd, &rect);
-
-    g_D3D9PresentParams.Windowed = 1;
-    g_D3D9PresentParams.FullScreen_RefreshRateInHz = 0;
-    g_D3D9PresentParams.BackBufferHeight = rect.bottom - rect.top;
-    g_D3D9PresentParams.BackBufferWidth = rect.right - rect.left;
-#else
-    g_D3D9PresentParams.Windowed = 0;
-    g_D3D9PresentParams.FullScreen_RefreshRateInHz = devMode.dmDisplayFrequency;
-    g_D3D9PresentParams.BackBufferWidth = devMode.dmPelsWidth;
-    g_D3D9PresentParams.BackBufferHeight = devMode.dmPelsHeight;
-#endif
-
-    if (g_D3D9 == NULL) {
-        MessageBox(NULL,_T("Failed to create D3D9."),_T("Test App Error"),MB_SETFOREGROUND|MB_OK|MB_SYSTEMMODAL|MB_TOPMOST);
-        return false;
-    }
-
-    if ( FAILED( g_D3D9->CreateDevice(D3DADAPTER_DEFAULT,
-                                      D3DDEVTYPE_HAL, 
-                                      g_hWnd, 
-                                      D3DCREATE_HARDWARE_VERTEXPROCESSING, 
-                                      &g_D3D9PresentParams, 
-                                      &g_D3D9Device) ) )
-    {
-        MessageBox(NULL,_T("Failed to create D3D Device."),_T("Test App Error"),MB_SETFOREGROUND|MB_OK|MB_SYSTEMMODAL|MB_TOPMOST);
-        exit(0);
-        return false;
-    }
-
-    status = NvAPI_Stereo_CreateHandleFromIUnknown(g_D3D9Device , &g_StereoHandle);
-    if (NVAPI_OK != status )
-    {
-        MessageBoxA(NULL, "Couldn't create the StereoHandle", "NvAPI_Stereo_CreateHandleFromIUnknown failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-    }
-
-    status= NvAPI_Stereo_GetEyeSeparation(g_StereoHandle,&g_EyeSeparation );
-    if (NVAPI_OK !=  status )
-    {
-        MessageBoxA(NULL, "Couldn't get the hardware eye separation", "NvAPI_Stereo_GetEyeSeparation failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-    }
-
-    // Setup the depth buffer
-    g_D3D9Device->CreateTexture(g_D3D9PresentParams.BackBufferWidth, g_D3D9PresentParams.BackBufferHeight, 1, D3DUSAGE_DEPTHSTENCIL, (D3DFORMAT)MAKEFOURCC('I','N','T','Z'), D3DPOOL_DEFAULT, &g_D3D9DepthBuffer, NULL);
-
-    if ( g_D3D9DepthBuffer )
-    {
-        g_D3D9DepthBuffer->GetSurfaceLevel(0, &g_D3D9DepthBufferSurface );
-    }
-
-    // Setup the viewport
-    g_D3D9MainViewport.Width = g_D3D9PresentParams.BackBufferWidth;
-    g_D3D9MainViewport.Height = g_D3D9PresentParams.BackBufferHeight;
-    g_D3D9MainViewport.MinZ = 0.0f;
-    g_D3D9MainViewport.MaxZ = 1.0f;
-    g_D3D9MainViewport.X = 0;
-    g_D3D9MainViewport.Y = 0;
-
-    // Setup the effect
-    {
-
-        DWORD dwShaderFlags = D3DXFX_NOT_CLONEABLE | D3DXSHADER_DEBUG;
-        ID3DXBuffer* pErrors = 0;
-
-        // Cube drawing effect
-        D3DXCreateEffect(   g_D3D9Device,
-                            (void*) g_cubeEffectSrc, 
-                            sizeof(g_cubeEffectSrc), 
-                            NULL, 
-                            NULL, 
-                            dwShaderFlags, 
-                            NULL, 
-                            &g_pCubeEffect, 
-                            &pErrors );
-
-        if( pErrors )
-        {
-            LPVOID l_pError = NULL;
-            l_pError = pErrors->GetBufferPointer(); // then cast to a char* to see it in the locals window
-            fprintf(stdout, "Compilation error: \n %s", (char*) l_pError);
-        }
-
-
-        g_pCubeTechnique = g_pCubeEffect->GetTechniqueByName( "Render" );
-
-        g_pvCubePosParam = g_pCubeEffect->GetParameterByName(0, "g_CubePos");
-        g_pmCubeRotParam = g_pCubeEffect->GetParameterByName(0, "g_CubeRot");
-        g_pmProjMatParam = g_pCubeEffect->GetParameterByName(0, "g_ProjMat");
-
-        // Unproject effect
-        D3DXCreateEffect(   g_D3D9Device,
-                            (void*) g_unprojectEffectSrc, 
-                            sizeof(g_unprojectEffectSrc), 
-                            NULL, 
-                            NULL, 
-                            dwShaderFlags, 
-                            NULL, 
-                            &g_pUnprojectEffect, 
-                            &pErrors );
-
-        if( pErrors )
-        {
-            LPVOID l_pError = NULL;
-            l_pError = pErrors->GetBufferPointer(); // then cast to a char* to see it in the locals window
-            fprintf(stdout, "Compilation error: \n %s", (char*) l_pError);
-        }
-
-
-        g_pCubeTechnique = g_pUnprojectEffect->GetTechniqueByName( "Render" );
-
-        g_pImageSizeInv = g_pUnprojectEffect->GetParameterByName(0, "g_ImageSizeInv");
-        D3DXVECTOR4 g_ImageSizeInv = D3DXVECTOR4( g_D3D9PresentParams.BackBufferWidth, g_D3D9PresentParams.BackBufferHeight,
-                                      1.0 / g_D3D9PresentParams.BackBufferWidth, 1.0 / g_D3D9PresentParams.BackBufferHeight );
-        g_pUnprojectEffect->SetVector( g_pImageSizeInv, &g_ImageSizeInv );
-
-        g_pQuadRect = g_pUnprojectEffect->GetParameterByName(0, "g_QuadRect");
-
-        g_pDepthBuffer = g_pUnprojectEffect->GetParameterByName(0, "g_DepthMap");
-        g_pUnprojectEffect->SetTexture( g_pDepthBuffer, g_D3D9DepthBuffer );
-
-        g_pmProjInvMatParam = g_pUnprojectEffect->GetParameterByName(0, "g_ProjInv");
-        g_pNearFarDepthProj = g_pUnprojectEffect->GetParameterByName(0, "g_NearFarDepthProj");
-
-        g_pCorrectStereo = g_pUnprojectEffect->GetParameterByName(0, "g_CorrectStereo");
-        g_pUnprojectEffect->SetBool( g_pCorrectStereo, gCorrectStereo );
-
-        g_pStereoEyeSeparation = g_pUnprojectEffect->GetParameterByName(0, "g_StereoEyeSeparation");
-        g_pUnprojectEffect->SetFloat( g_pStereoEyeSeparation, g_EyeSeparation );
-
-        g_pStereoSeparation = g_pUnprojectEffect->GetParameterByName(0, "g_StereoSeparation");
-        g_pStereoConvergence = g_pUnprojectEffect->GetParameterByName(0, "g_StereoConvergence");
-
-        g_StereoParamD3D9.createGraphics( g_D3D9Device );
-        g_pStereoParamMap = g_pUnprojectEffect->GetParameterByName(0, "g_StereoParamMap");
-        g_pUnprojectEffect->SetTexture( g_pStereoParamMap, g_StereoParamD3D9.getStereoParamMapTexture() );
-
-        // Setup projection and Unprojection matrix
-        float Near = 2.f;
-        float Far = 20.0f;
-        float fAspectRatio = (FLOAT)g_D3D9MainViewport.Width / (FLOAT)g_D3D9MainViewport.Height;
-        D3DXMATRIX mProj;
-        D3DXMatrixPerspectiveFovLH( &mProj, D3DX_PI/4, fAspectRatio, Near, Far );
-
-        D3DXMATRIX mProjInv;
-        D3DXMatrixInverse( &mProjInv, 0, &mProj );
-
-        g_pCubeEffect->SetMatrix( g_pmProjMatParam, &mProj );
-        g_pUnprojectEffect->SetMatrix( g_pmProjInvMatParam, &mProjInv );
-
-        D3DXVECTOR4 vNearFarDepthProj( Near, Far, Far / (Far - Near), -Near*Far / (Far - Near) );
-        g_pUnprojectEffect->SetVector( g_pNearFarDepthProj, &vNearFarDepthProj );
-
-
-        g_D3D9Device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-        g_D3D9Device->SetRenderState(D3DRS_LIGHTING, FALSE);
-        g_D3D9Device->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
-    }
-
-#else
     HRESULT hr = S_OK;
 
     // Select our adapter
@@ -940,45 +763,12 @@ bool CreateWindowAndDevice()
         g_D3D10Device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
     }
 
-#endif
-
     return true;
 }
 
 void FreeWindowAndDevice()
 {
-#ifdef D3D9
 
-    if (g_D3D9DepthBufferSurface )
-    {
-        g_D3D9DepthBufferSurface->Release();
-        g_D3D9DepthBufferSurface = 0;
-    }
-    if (g_D3D9DepthBuffer )
-    {
-        g_D3D9DepthBuffer->Release();
-        g_D3D9DepthBuffer = 0;
-    }
-    if (g_pCubeEffect)
-    {
-        g_pCubeEffect->Release(); 
-        g_pCubeEffect = 0;
-    }
-    if (g_pUnprojectEffect)
-    {
-        g_pUnprojectEffect->Release();
-        g_pUnprojectEffect = 0;
-    }
-
-    g_StereoParamD3D9.destroyGraphics();
-
-    g_D3D9Device->Release();
-
-    if (g_D3D9->Release() != 0) {
-        MessageBox(NULL,_T("Failed to release all D3D objects."),_T("Test App Error"),MB_SETFOREGROUND|MB_OK|MB_SYSTEMMODAL|MB_TOPMOST);
-    }
-
-#else
     if (g_DXGISwapChain)
     {
         BOOL isFullScreen;
@@ -1027,7 +817,7 @@ void FreeWindowAndDevice()
         g_D3D10Device->Release();
         g_D3D10Device = 0;
     }
-#endif
+
 }
 
 
@@ -1045,213 +835,41 @@ void Render()
 {
     static unsigned int frameNb = 0;
 
-    if (frameNb % 2 == 0)
+    float black[] = { 0.0f, 0.0f, 0.0f, 1.f };
+    float white[] = { 1.0f, 1.0f, 1.0f, 1.f };
+
+    NvAPI_Status status;
+
+
+    status = NvAPI_Stereo_SetActiveEye(g_StereoHandle, NV_STEREO_ACTIVE_EYE::NVAPI_STEREO_EYE_LEFT);
+    if (status != NVAPI_OK)
     {
-        auto status = NvAPI_Stereo_SetActiveEye(g_StereoHandle, NV_STEREO_ACTIVE_EYE::NVAPI_STEREO_EYE_LEFT);
-        if (status != NVAPI_OK)
-        {
-            MessageBoxA(NULL, "没法设置成目标左眼！", "NvAPI_Stereo_SetActiveEye failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
-        }
-    }
-    else
-    {
-        auto status = NvAPI_Stereo_SetActiveEye(g_StereoHandle, NV_STEREO_ACTIVE_EYE::NVAPI_STEREO_EYE_RIGHT);
-        if (status != NVAPI_OK)
-        {
-            MessageBoxA(NULL, "没法设置成目标右眼！", "NvAPI_Stereo_SetActiveEye failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
-        }
-    }
-
-
-#ifdef D3D9
-    HRESULT coop_lvl = g_D3D9Device->TestCooperativeLevel();
-
-    if (coop_lvl == D3DERR_DEVICELOST) return;
-
-    if (coop_lvl == D3DERR_DEVICENOTRESET)
-    {
-        g_D3D9Device->Reset(&g_D3D9PresentParams);
-        DestroyWindow( g_hWnd);
-        return;
-    }
-
-    g_D3D9Device->BeginScene();
-
-    g_D3D9Device->SetDepthStencilSurface( g_D3D9DepthBufferSurface );
-    g_D3D9Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xFF000000, 1, 0);
-
-    g_D3D9Device->SetViewport(&g_D3D9MainViewport);
-
-    if (frameNb > 2)
-    {
-
-        float sep, conv;
-        if (NVAPI_OK != NvAPI_Stereo_GetSeparation(g_StereoHandle,&sep ))
-        {
-         //   MessageBoxA(NULL, "Couldn't get the separation", "NvAPI_Stereo_GetSeparation failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-        }
-        if (NVAPI_OK != NvAPI_Stereo_GetConvergence(g_StereoHandle,&conv ))
-        {
-         //   MessageBoxA(NULL, "Couldn't get the convergence", "NvAPI_Stereo_GetConvergence failed", MB_OK|MB_SETFOREGROUND|MB_TOPMOST);
-        }
-        if (sep * 0.01 != g_Separation || conv != g_Convergence)
-        {
-            g_Separation = sep * 0.01;
-            g_Convergence = conv;
-            g_pUnprojectEffect->SetFloat( g_pStereoSeparation, g_Separation );
-            g_pUnprojectEffect->SetFloat( g_pStereoConvergence, g_Convergence );
-
-            g_StereoParamD3D9.updateStereoParamsMap( g_D3D9Device, g_EyeSeparation, g_Separation, g_Convergence );
-        }
-
-        // first draw the grid of boxes in color and depth buffer
-        float rotSpeed = frameNb * 0.05;
-        float time = frameNb*0.1;
-        static float gTime = time;
-        if (gAnimate)
-        {
-            gTime = time;
-            D3DXMATRIX rot;
-            D3DXMatrixRotationYawPitchRoll( &rot, 0.02 * rotSpeed, 0.01*rotSpeed, 0.05*rotSpeed);
-            g_pCubeEffect->SetMatrix( g_pmCubeRotParam, &rot );
-        }
-
-        //
-        // draw the cube
-        //
-        struct VertexStruct
-        {
-            float position[3];
-            float texture[3];
-        };
-
-        VertexStruct VB[24] = 
-        {
-            {  {-1,-1,-1,},  {0,0,-1,},  }, 
-            {  {1,-1,-1,},  {0,0,-1,},  },
-            {  {-1,1,-1,}, {0,0,-1,},  },
-            {  {1,1,-1,},  {0,0,-1,},  },
-
-            {  {-1,1,1,}, {0,0,1,},  },
-            {  {1,1,1,},  {0,0,1,},  },
-            {  {-1,-1,1,},  {0,0,1,},  }, 
-            {  {1,-1,1,},  {0,0,1,},  },
-
-            {  {-1,1,-1,},  {0,1,0,},  }, 
-            {  {1,1,-1,},  {0,1,0,},  },
-            {  {-1,1,1,}, {0,1,0,},  },
-            {  {1,1,1,},  {0,1,0,},  },
-
-            {  { -1, -1,1,}, {0,-1,0,},  },
-            {  { 1, -1,1,},  {0,-1,0,},  },
-            {  {-1,-1,-1,},  {0,-1,0,},  }, 
-            {  { 1,-1,-1,},  {0,-1,0,},  },
-
-            {  {-1,-1,1,},  {-1,0,0,},  }, 
-            {  {-1,-1,-1,},   {-1,0,0,},  },
-            {  {-1,1,1,},   {-1,0,0,},  },
-            {  {-1,1,-1,},    {-1,0,0,},  },
-
-            {  {1,-1,-1,},   {1,0,0,},  },
-            {  {1,-1,1,},    {1,0,0,},  },
-            {  {1,1,-1,},  {1,0,0,},  }, 
-            {  {1,1,1,},   {1,0,0,},  },
-        };
-
-        unsigned int IB[36] = 
-        {
-            0,1,2,
-            2,1,3,
-
-            4,5,6,
-            6,5,7,
-
-            8,9,10,
-            10,9,11,
-
-            12,13,14,
-            14,13,15,
-
-            16,17,18,
-            18,17,19,
-
-            20,21,22,
-            22,21,23,
-        };
-
-
-        int gridCount = 11;
-        float gridSize = 2.0f;
-
-        g_D3D9Device->SetFVF(D3DFVF_XYZ|D3DFVF_TEX1|D3DFVF_TEXCOORDSIZE3(0));
-        g_pCubeEffect->SetTechnique( g_pCubeTechnique );
-        UINT cPasses;
-        g_pCubeEffect->Begin( &cPasses, 0 );
-
-            for( UINT iPass = 0; iPass < cPasses; iPass++ )
-            {
-                for (UINT c = 0; c < gridCount*gridCount; c++)
-                {
-                    {
-                        float gridInvCount = 1.0f / (gridCount-1.0f);
-                        float u = 2.f *gridInvCount *(c % gridCount) - 1.f;
-                        float v = 2.f *gridInvCount *(c / gridCount) - 1.f;
-                        float r = u*u + v*v;
-                        float instanceOffset =  (1- r) * cos( r *0.5*3.14)*(sin( gTime *0.05 ));
-                        D3DXVECTOR4 cubePos = D3DXVECTOR4( gridSize * ( u ), gridSize * ( v ), 5.0f + 3.0f * instanceOffset , gridSize * 0.5* gridInvCount );
-                        g_pCubeEffect->SetVector( g_pvCubePosParam, &cubePos );
-                    }
-
-                    g_pCubeEffect->BeginPass( iPass );
-                    g_D3D9Device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, 24, 12, IB, D3DFMT_INDEX32, VB, sizeof(VertexStruct) );
-                    g_pCubeEffect->EndPass();
-                }
-            }
-        g_pCubeEffect->End();
-
-        // Draw the full screnen quad
-        // Draw the quad with unproject code
-
-        g_D3D9Device->SetDepthStencilSurface( 0 );
-
-        float QuadB[12] = 
-        {
-            0,0,0,
-            1,0,0,
-            0,1,0,
-            1,1,0,
-        };
-        D3DXVECTOR4 quadRect( -0.9f, -1.0f, 1.8f , 1.0f );
-        g_pUnprojectEffect->SetVector( g_pQuadRect, &quadRect);
-        g_pUnprojectEffect->SetBool( g_pCorrectStereo, gCorrectStereo );
-
-        g_D3D9Device->SetFVF(D3DFVF_XYZ);
-        
-        g_pUnprojectEffect->SetTechnique( g_pUnprojectTechnique );
-        g_pUnprojectEffect->Begin( &cPasses, 0 );
-            for( UINT iPass = 0; iPass < cPasses; iPass++ )
-            {
-                g_pUnprojectEffect->BeginPass( iPass );
-                g_D3D9Device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, QuadB, sizeof(float)*3 );
-                g_pUnprojectEffect->EndPass();
-            }
-        g_pUnprojectEffect->End();
+        MessageBoxA(NULL, "没法设置成目标左眼！", "NvAPI_Stereo_SetActiveEye failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
 
     }
 
-    g_D3D9Device->EndScene();
-    g_D3D9Device->Present(NULL, NULL, NULL, NULL);
+    g_D3D10Device->RSSetViewports(1, &g_D3D10MainViewport);
 
-#else
-    g_D3D10Device->RSSetViewports( 1, &g_D3D10MainViewport );
+    g_D3D10Device->ClearRenderTargetView(g_D3D10BackBufferRTV, black);
+    g_D3D10Device->ClearDepthStencilView(g_D3D10DepthBufferDSV, D3D10_CLEAR_DEPTH, 1, 0);
 
-    float color[] = {0.0f, 0.0f, 0.0f, 1.f};
-    g_D3D10Device->ClearRenderTargetView( g_D3D10BackBufferRTV, color);
-    g_D3D10Device->ClearDepthStencilView( g_D3D10DepthBufferDSV, D3D10_CLEAR_DEPTH, 1, 0);
+    g_D3D10Device->OMSetRenderTargets(1, &g_D3D10BackBufferRTV, g_D3D10DepthBufferDSV);
+    g_DXGISwapChain->Present(0, 0);
 
-    g_D3D10Device->OMSetRenderTargets( 1, &g_D3D10BackBufferRTV, g_D3D10DepthBufferDSV);
+    status = NvAPI_Stereo_SetActiveEye(g_StereoHandle, NV_STEREO_ACTIVE_EYE::NVAPI_STEREO_EYE_RIGHT);
+    if (status != NVAPI_OK)
+    {
+        MessageBoxA(NULL, "没法设置成目标右眼！", "NvAPI_Stereo_SetActiveEye failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
+    }
+    g_D3D10Device->RSSetViewports(1, &g_D3D10MainViewport);
 
-    if (frameNb > 2)
+    g_D3D10Device->ClearRenderTargetView(g_D3D10BackBufferRTV, white);
+    //g_D3D10Device->ClearDepthStencilView(g_D3D10DepthBufferDSV, D3D10_CLEAR_DEPTH, 1, 0);
+
+    g_D3D10Device->OMSetRenderTargets(1, &g_D3D10BackBufferRTV, g_D3D10DepthBufferDSV);
+    g_StereoParamD3D10.updateStereoParamsMap(g_D3D10Device, 0, 0, 0);
+
+   /* if (frameNb > 2)
     {
  
         float sep=0, conv=0;
@@ -1305,10 +923,8 @@ void Render()
         g_pUnprojectTechnique->GetPassByIndex(0)->Apply(0);
         g_D3D10Device->Draw( 4, 0 );
     }
-
+    */
     g_DXGISwapChain->Present(0, 0);
-
-#endif
 
     frameNb++;
 
