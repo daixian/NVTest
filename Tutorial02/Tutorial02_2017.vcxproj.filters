@@ -21,9 +21,4 @@
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="Tutorial02.fx">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-  </ItemGroup>
 </Project>
