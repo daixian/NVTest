@@ -83,7 +83,7 @@ void clearScene(int eye);
 void setRenderTarget(int eye);
 bool createBackBufferViews();
 //--------------------------------------------------------------------------------------
-// Entry point to the program. Initializes everything and goes into a message processing 
+// Entry point to the program. Initializes everything and goes into a message processing
 // loop. Idle time is used to render the scene.
 //--------------------------------------------------------------------------------------
 int WINAPI wWinMain( _In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow )
@@ -94,23 +94,18 @@ int WINAPI wWinMain( _In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
     if( FAILED( InitWindow( hInstance, nCmdShow ) ) )
         return 0;
 
-    if( FAILED( InitDevice() ) )
-    {
+    if( FAILED( InitDevice() ) ) {
         CleanupDevice();
         return 0;
     }
 
     // Main message loop
     MSG msg = {0};
-    while( WM_QUIT != msg.message )
-    {
-        if( PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) )
-        {
+    while( WM_QUIT != msg.message ) {
+        if( PeekMessage( &msg, nullptr, 0, 0, PM_REMOVE ) ) {
             TranslateMessage( &msg );
             DispatchMessage( &msg );
-        }
-        else
-        {
+        } else {
             Render();
         }
     }
@@ -172,8 +167,8 @@ HRESULT CompileShaderFromFile( const WCHAR* szFileName, LPCSTR szEntryPoint, LPC
     DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #ifdef _DEBUG
     // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
-    // Setting this flag improves the shader debugging experience, but still allows 
-    // the shaders to be optimized and to run exactly the way they will run in 
+    // Setting this flag improves the shader debugging experience, but still allows
+    // the shaders to be optimized and to run exactly the way they will run in
     // the release configuration of this program.
     dwShaderFlags |= D3DCOMPILE_DEBUG;
 
@@ -182,12 +177,10 @@ HRESULT CompileShaderFromFile( const WCHAR* szFileName, LPCSTR szEntryPoint, LPC
 #endif
 
     ID3DBlob* pErrorBlob = nullptr;
-    hr = D3DCompileFromFile( szFileName, nullptr, nullptr, szEntryPoint, szShaderModel, 
-        dwShaderFlags, 0, ppBlobOut, &pErrorBlob );
-    if( FAILED(hr) )
-    {
-        if( pErrorBlob )
-        {
+    hr = D3DCompileFromFile( szFileName, nullptr, nullptr, szEntryPoint, szShaderModel,
+                             dwShaderFlags, 0, ppBlobOut, &pErrorBlob );
+    if( FAILED(hr) ) {
+        if( pErrorBlob ) {
             OutputDebugStringA( reinterpret_cast<const char*>( pErrorBlob->GetBufferPointer() ) );
             pErrorBlob->Release();
         }
@@ -217,28 +210,24 @@ HRESULT InitDevice()
     createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    D3D_DRIVER_TYPE driverTypes[] =
-    {
+    D3D_DRIVER_TYPE driverTypes[] = {
         D3D_DRIVER_TYPE_HARDWARE,
         D3D_DRIVER_TYPE_WARP,
         D3D_DRIVER_TYPE_REFERENCE,
     };
     UINT numDriverTypes = ARRAYSIZE( driverTypes );
 
-    D3D_FEATURE_LEVEL featureLevels[] =
-    {
+    D3D_FEATURE_LEVEL featureLevels[] = {
         D3D_FEATURE_LEVEL_11_1,
     };
-	UINT numFeatureLevels = ARRAYSIZE( featureLevels );
+    UINT numFeatureLevels = ARRAYSIZE( featureLevels );
 
-    for( UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++ )
-    {
+    for( UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++ ) {
         g_driverType = driverTypes[driverTypeIndex];
         hr = D3D11CreateDevice( nullptr, g_driverType, nullptr, createDeviceFlags, featureLevels, numFeatureLevels,
                                 D3D11_SDK_VERSION, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext );
 
-        if ( hr == E_INVALIDARG )
-        {
+        if ( hr == E_INVALIDARG ) {
             // DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
             hr = D3D11CreateDevice( nullptr, g_driverType, nullptr, createDeviceFlags, &featureLevels[1], numFeatureLevels - 1,
                                     D3D11_SDK_VERSION, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext );
@@ -255,12 +244,10 @@ HRESULT InitDevice()
     {
         IDXGIDevice* dxgiDevice = nullptr;
         hr = g_pd3dDevice->QueryInterface( __uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice) );
-        if (SUCCEEDED(hr))
-        {
+        if (SUCCEEDED(hr)) {
             IDXGIAdapter* adapter = nullptr;
             hr = dxgiDevice->GetAdapter(&adapter);
-            if (SUCCEEDED(hr))
-            {
+            if (SUCCEEDED(hr)) {
                 hr = adapter->GetParent( __uuidof(IDXGIFactory1), reinterpret_cast<void**>(&dxgiFactory) );
                 adapter->Release();
             }
@@ -273,14 +260,20 @@ HRESULT InitDevice()
     // Create swap chain
     IDXGIFactory2* dxgiFactory2 = nullptr;
     hr = dxgiFactory->QueryInterface( __uuidof(IDXGIFactory2), reinterpret_cast<void**>(&dxgiFactory2) );
-    if ( dxgiFactory2 )
-    {
+    if ( dxgiFactory2 ) {
         // DirectX 11.1 or later
         hr = g_pd3dDevice->QueryInterface( __uuidof(ID3D11Device1), reinterpret_cast<void**>(&g_pd3dDevice1) );
-        if (SUCCEEDED(hr))
-        {
+        if (SUCCEEDED(hr)) {
             (void) g_pImmediateContext->QueryInterface( __uuidof(ID3D11DeviceContext1), reinterpret_cast<void**>(&g_pImmediateContext1) );
         }
+
+        BOOL isWinStereo = dxgiFactory2->IsWindowedStereoEnabled();
+        if (!isWinStereo)
+        {
+            MessageBox(nullptr,
+                L"IsWindowedStereoEnabled = false.", L"Error", MB_OK);
+        }
+
 
         DXGI_SWAP_CHAIN_DESC1 sd = {};
         sd.Width = width;
@@ -306,15 +299,12 @@ HRESULT InitDevice()
 
 
         hr = dxgiFactory2->CreateSwapChainForHwnd( g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1 );
-        if (SUCCEEDED(hr))
-        {
+        if (SUCCEEDED(hr)) {
             hr = g_pSwapChain1->QueryInterface( __uuidof(IDXGISwapChain), reinterpret_cast<void**>(&g_pSwapChain) );
         }
 
         dxgiFactory2->Release();
-    }
-    else
-    {
+    } else {
         // DirectX 11.0 systems
         DXGI_SWAP_CHAIN_DESC sd = {}; //描述一个交换链
         sd.BufferCount = 1;
@@ -353,8 +343,7 @@ HRESULT InitDevice()
 
     //g_pImmediateContext->OMSetRenderTargets( 1, &g_pRenderTargetView, nullptr );
 
-    if (!createBackBufferViews())
-    {
+    if (!createBackBufferViews()) {
         return hr;
     }
 
@@ -371,57 +360,52 @@ HRESULT InitDevice()
     // Compile the vertex shader
     ID3DBlob* pVSBlob = nullptr;
     hr = CompileShaderFromFile( L"Tutorial02.fx", "VS", "vs_4_0", &pVSBlob );
-    if( FAILED( hr ) )
-    {
+    if( FAILED( hr ) ) {
         MessageBox( nullptr,
                     L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
         return hr;
     }
 
-	// Create the vertex shader
-	hr = g_pd3dDevice->CreateVertexShader( pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), nullptr, &g_pVertexShader );
-	if( FAILED( hr ) )
-	{	
-		pVSBlob->Release();
-      return hr;
-	}
+    // Create the vertex shader
+    hr = g_pd3dDevice->CreateVertexShader( pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), nullptr, &g_pVertexShader );
+    if( FAILED( hr ) ) {
+        pVSBlob->Release();
+        return hr;
+    }
 
     // Define the input layout
-    D3D11_INPUT_ELEMENT_DESC layout[] =
-    {
+    D3D11_INPUT_ELEMENT_DESC layout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
     };
-	UINT numElements = ARRAYSIZE( layout );
+    UINT numElements = ARRAYSIZE( layout );
 
     // Create the input layout
-	hr = g_pd3dDevice->CreateInputLayout( layout, numElements, pVSBlob->GetBufferPointer(),
+    hr = g_pd3dDevice->CreateInputLayout( layout, numElements, pVSBlob->GetBufferPointer(),
                                           pVSBlob->GetBufferSize(), &g_pVertexLayout );
-	pVSBlob->Release();
-	if( FAILED( hr ) )
+    pVSBlob->Release();
+    if( FAILED( hr ) )
         return hr;
 
     // Set the input layout
     g_pImmediateContext->IASetInputLayout( g_pVertexLayout );
 
-	// Compile the pixel shader
-	ID3DBlob* pPSBlob = nullptr;
+    // Compile the pixel shader
+    ID3DBlob* pPSBlob = nullptr;
     hr = CompileShaderFromFile( L"Tutorial02.fx", "PS", "ps_4_0", &pPSBlob );
-    if( FAILED( hr ) )
-    {
+    if( FAILED( hr ) ) {
         MessageBox( nullptr,
                     L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
         return hr;
     }
 
-	//// Create the pixel shader
-	hr = g_pd3dDevice->CreatePixelShader( pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), nullptr, &g_pPixelShader );
-	pPSBlob->Release();
+    //// Create the pixel shader
+    hr = g_pd3dDevice->CreatePixelShader( pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), nullptr, &g_pPixelShader );
+    pPSBlob->Release();
     if( FAILED( hr ) )
         return hr;
 
     // Create vertex buffer
-    SimpleVertex vertices[] =
-    {
+    SimpleVertex vertices[] = {
         XMFLOAT3( 0.0f, 0.5f, 0.5f ),
         XMFLOAT3( 0.5f, -0.5f, 0.5f ),
         XMFLOAT3( -0.5f, -0.5f, 0.5f ),
@@ -430,7 +414,7 @@ HRESULT InitDevice()
     bd.Usage = D3D11_USAGE_DEFAULT;
     bd.ByteWidth = sizeof( SimpleVertex ) * 3;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	bd.CPUAccessFlags = 0;
+    bd.CPUAccessFlags = 0;
 
     D3D11_SUBRESOURCE_DATA InitData = {};
     InitData.pSysMem = vertices;
@@ -487,8 +471,7 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
     PAINTSTRUCT ps;
     HDC hdc;
 
-    switch( message )
-    {
+    switch( message ) {
     case WM_PAINT:
         hdc = BeginPaint( hWnd, &ps );
         EndPaint( hWnd, &ps );
@@ -498,8 +481,8 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
         PostQuitMessage( 0 );
         break;
 
-        // Note that this tutorial does not handle resizing (WM_SIZE) requests,
-        // so we created the window without the resize border.
+    // Note that this tutorial does not handle resizing (WM_SIZE) requests,
+    // so we created the window without the resize border.
 
     default:
         return DefWindowProc( hWnd, message, wParam, lParam );
@@ -515,13 +498,13 @@ void Render()
 {
     setRenderTarget(0);
 
-    // Clear the back buffer 
+    // Clear the back buffer
     //g_pImmediateContext->ClearRenderTargetView(g_backBufferRenderTargetView, Colors::MidnightBlue );
     clearScene(0);
 
     // Render a triangle
-	g_pImmediateContext->VSSetShader( g_pVertexShader, nullptr, 0 );
-	g_pImmediateContext->PSSetShader( g_pPixelShader, nullptr, 0 );
+    g_pImmediateContext->VSSetShader( g_pVertexShader, nullptr, 0 );
+    g_pImmediateContext->PSSetShader( g_pPixelShader, nullptr, 0 );
     g_pImmediateContext->Draw( 3, 0 );
 
     setRenderTarget(1);
@@ -538,8 +521,7 @@ void Render()
 
 void setRenderTarget(int eye)
 {
-    switch (eye)
-    {
+    switch (eye) {
     case 0:
         g_pImmediateContext1->OMSetRenderTargets(1, &g_backBufferRenderTargetView, nullptr); //g_backBufferDepthStencilView 这里如果设置了深度那么就会不存在currentRenderTargetView
         g_backBufferRenderTargetView->Release();
@@ -560,16 +542,12 @@ void clearScene(int eye)
     g_pImmediateContext1->OMGetRenderTargets(1, &currentRenderTargetView, NULL);
 
     // Clear the back buffer.
-    if (currentRenderTargetView)
-    {
-        if (eye == 0)
-        {
+    if (currentRenderTargetView) {
+        if (eye == 0) {
             float clearColor[4] = { 0.0f, 1.0f, 0.0f, 1.0f }; // red, green, blue, alpha
             g_pImmediateContext1->ClearRenderTargetView(currentRenderTargetView, clearColor);
             g_pImmediateContext1->ClearDepthStencilView(g_backBufferDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-        }
-        else
-        {
+        } else {
             float clearColor[4] = { 1.0f, 0.0f, 1.0f, 1.0f }; // red, green, blue, alpha
             g_pImmediateContext1->ClearRenderTargetView(currentRenderTargetView, clearColor);
             g_pImmediateContext1->ClearDepthStencilView(g_backBufferDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
@@ -590,16 +568,14 @@ bool createBackBufferViews()
     CD3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc(D3D11_RTV_DIMENSION_TEXTURE2DARRAY, DXGI_FORMAT_B8G8R8A8_UNORM, 0, 0, 1);
 
     //在渲染目标上创建一个视图界面，用于单声道或左眼视图的绑定。
-    if (FAILED(g_pd3dDevice->CreateRenderTargetView(backBuffer, nullptr, &g_backBufferRenderTargetView)))//只能为null，否则失败
-    {
+    if (FAILED(g_pd3dDevice->CreateRenderTargetView(backBuffer, nullptr, &g_backBufferRenderTargetView))) { //只能为null，否则失败
         backBuffer->Release();
         return false;
     }
 
     // 立体交换链具有阵列资源，因此创建第二个渲染目标。
     CD3D11_RENDER_TARGET_VIEW_DESC renderTargetViewRightDesc(D3D11_RTV_DIMENSION_TEXTURE2DARRAY, DXGI_FORMAT_B8G8R8A8_UNORM, 0, 1, 1);
-    if (FAILED(g_pd3dDevice->CreateRenderTargetView(backBuffer, nullptr , &g_rightRenderTargetView)))
-    {
+    if (FAILED(g_pd3dDevice->CreateRenderTargetView(backBuffer, nullptr, &g_rightRenderTargetView))) {
         backBuffer->Release();
         return false;
     }
