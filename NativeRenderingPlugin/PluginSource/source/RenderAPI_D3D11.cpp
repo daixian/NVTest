@@ -142,7 +142,17 @@ void RenderAPI_D3D11::CreateResources()
 	D3D11_BUFFER_DESC desc;
 	memset(&desc, 0, sizeof(desc));
 
-	// vertex buffer
+    //实验一下得到这个context，考虑使用这个context来进行一些操作
+    ID3D11DeviceContext* context;
+    m_Device->GetImmediateContext(&context);
+
+    ID3D11RenderTargetView* targets[] = { nullptr,nullptr };
+    context->OMGetRenderTargets(ARRAYSIZE(targets), targets, nullptr);
+    D3D11_RENDER_TARGET_VIEW_DESC targetView;
+    targets[0] -> GetDesc(&targetView);
+
+
+    // vertex buffer
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.ByteWidth = 1024;
 	desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
